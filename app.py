@@ -18,16 +18,21 @@ def extract_pages():
         start_page = int(data['start_page'])
         end_page = int(data['end_page'])
         
-        response = requests.get(pdf_url, timeout=60)
-        pdf_file = BytesIO(response.content)
+        # Télécharge avec headers pour éviter les blocages
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(pdf_url, timeout=120, headers=headers, stream=True)
+        response.raise_for_status()
         
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        # Lit le PDF en mémoire
+        pdf_content = BytesIO(response.content)
+        pdf_reader = PyPDF2.PdfReader(pdf_content)
         pdf_writer = PyPDF2.PdfWriter()
         
-        for page_num in range(start_page - 1, end_page):
-            if page_num < len(pdf_reader.pages):
-                pdf_writer.add_page(pdf_reader.pages[page_num])
+        # Extrait les pages
+        for page_num in range(start_page - 1, min(end_page, len(pdf_reader.pages))):
+            pdf_writer.add_page(pdf_reader.pages[page_num])
         
+        # Génère le PDF de sortie
         output = BytesIO()
         pdf_writer.write(output)
         output.seek(0)
@@ -40,7 +45,7 @@ def extract_pages():
         )
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e), 'type': type(e).__name__}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
